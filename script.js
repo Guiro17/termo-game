@@ -1,6 +1,6 @@
 const GAME_CONFIG = {
-    mode: "sequence", // "random" para aleatório, "sequence" para sequência fixa
-    fixedWords: ["TESTE", "PROVA", "FALAR", "MUNDO", "CORPO"] // Palavras que serão usadas no modo sequence
+    mode: "random", // "random" para aleatório, "sequence" para sequência fixa
+    fixedWords: [] // Palavras que serão usadas no modo sequence
 };
 class TermoGame {
     constructor() {
