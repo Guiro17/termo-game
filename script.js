@@ -1,160 +1,176 @@
 const GAME_CONFIG = {
-    mode: "sequence",
-    fixedWords: ["TESTE", "PROVA", "FALAR", "MUNDO", "CORPO"]
+    mode: "sequence", // "random" para aleatório, "sequence" para sequência fixa
+    fixedWords: ["TESTE", "PROVA", "FALAR", "MUNDO", "CORPO"] // Palavras que serão usadas no modo sequence
 };
 class TermoGame {
     constructor() {
-        this.height = 6;
-        this.width = 5;
-        this.row = 0;
-        this.col = 0;
+        this.height = 6;    // número de tentativas
+        this.width = 5;     // tamanho das palavras
+        this.row = 0;       // tentativa atual
+        this.col = 0;       // letra atual
         this.gameOver = false;
         this.wordList = [];
         this.word = "";
         this.gameMode = GAME_CONFIG.mode;
         this.currentWordIndex = 0;
         this.fixedWords = GAME_CONFIG.fixedWords;
-        this.playerName = "";
-        this.startTime = null;
-        this.wordsCompleted = 0;
-        this.showNamePrompt();
+        this.initialize();
     }
-    showNamePrompt() {
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        `;
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: var(--primary-bg);
-            padding: 2rem;
-            border-radius: 10px;
-            text-align: center;
-        `;
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = 'Digite seu nome';
-        input.style.cssText = `
-            padding: 0.5rem;
-            margin: 1rem;
-            font-size: 1.2rem;
-            border-radius: 5px;
-            border: none;
-        `;
-        const button = document.createElement('button');
-        button.textContent = 'Começar';
-        button.style.cssText = `
-            padding: 0.5rem 1rem;
-            background: var(--correct-color);
-            border: none;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            font-size: 1.2rem;
-        `;
-        button.onclick = () => {
-            if (input.value.trim()) {
-                this.playerName = input.value.trim();
-                document.body.removeChild(modal);
-                this.initialize();
-                this.startTime = Date.now();
-            } else {
-                alert('Por favor, digite seu nome!');
-            }
-        };
-        content.appendChild(document.createElement('h2')).textContent = 'Bem-vindo ao Termo!';
-        content.appendChild(input);
-        content.appendChild(document.createElement('br'));
-        content.appendChild(button);
-        modal.appendChild(content);
-        document.body.appendChild(modal);
-        input.focus();
+    async initialize() {
+        await this.loadWordList();
+        this.createControls();
+        this.createBoard();
+        this.createKeyboard();
+        this.setupEventListeners();
+        this.selectWord();
     }
-    showRanking() {
-        const rankings = this.getRankings();
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        `;
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: var(--primary-bg);
-            padding: 2rem;
-            border-radius: 10px;
-            text-align: center;
-            max-width: 80%;
-            max-height: 80%;
-            overflow-y: auto;
-        `;
-        content.innerHTML = `
-            <h2>Top 10 Jogadores</h2>
-            <table style="width: 100%; margin-top: 1rem;">
-                <tr>
-                    <th>Posição</th>
-                    <th>Nome</th>
-                    <th>Tempo</th>
-                </tr>
-                ${rankings.map((rank, index) => `
-                    <tr style="background: ${this.playerName === rank.name ? 'var(--correct-color)' : 'transparent'}">
-                        <td>${index + 1}º</td>
-                        <td>${rank.name}</td>
-                        <td>${this.formatTime(rank.time)}</td>
-                    </tr>
-                `).join('')}
-            </table>
-            <button onclick="location.reload()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: var(--correct-color); border: none; border-radius: 5px; color: white; cursor: pointer;">
-                Jogar Novamente
-            </button>
-        `;
-        modal.appendChild(content);
-        document.body.appendChild(modal);
-    }
-    formatTime(ms) {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-    getRankings() {
-        const rankings = JSON.parse(localStorage.getItem('termoRankings') || '[]');
-        return rankings.sort((a, b) => a.time - b.time).slice(0, 10);
-    }
-    saveScore(time) {
-        const rankings = JSON.parse(localStorage.getItem('termoRankings') || '[]');
-        rankings.push({
-            name: this.playerName,
-            time: time
-        });
-        rankings.sort((a, b) => a.time - b.time);
-        localStorage.setItem('termoRankings', JSON.stringify(rankings.slice(0, 10)));
-    }
-    updateTimer() {
-        if (!this.startTime || this.gameOver) return;
-        const elapsed = Date.now() - this.startTime;
-        const timerElement = document.getElementById('timer');
-        if (timerElement) {
-            timerElement.textContent = this.formatTime(elapsed);
+    async loadWordList() {
+        if (this.gameMode === "sequence") {
+            this.wordList = this.fixedWords.map(word => this.normalizeWord(word));
+            console.log("Usando lista fixa de palavras:", this.wordList);
+            return;
+        }
+        try {
+            const response = await fetch('palavras.txt');
+            const text = await response.text();
+            this.wordList = text.split('\n')
+                               .filter(word => word.trim().length === 5)
+                               .map(word => this.normalizeWord(word));
+            console.log(`Carregadas ${this.wordList.length} palavras válidas`);
+        } catch (error) {
+            console.error('Erro ao carregar lista de palavras:', error);
+            this.wordList = ["TERMO", "TESTE", "PLANO", "CAMPO", "VERDE"];
         }
     }
-    // ... [resto dos métodos anteriores permanecem iguais] ...
+    normalizeWord(word) {
+        return word.trim()
+                  .toUpperCase()
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '');
+    }
+    createControls() {
+        const controls = document.getElementById('controls');
+        const randomBtn = document.createElement('button');
+        randomBtn.innerText = 'Modo Aleatório';
+        randomBtn.className = 'control-btn active';
+        randomBtn.onclick = () => this.setGameMode('random');
+        const sequenceBtn = document.createElement('button');
+        sequenceBtn.innerText = 'Próximas 5 Palavras';
+        sequenceBtn.className = 'control-btn';
+        sequenceBtn.onclick = () => this.setGameMode('sequence');
+        controls.appendChild(randomBtn);
+        controls.appendChild(sequenceBtn);
+        this.controlButtons = {
+            random: randomBtn,
+            sequence: sequenceBtn
+        };
+    }
+    setGameMode(mode) {
+        this.gameMode = mode;
+        this.currentWordIndex = 0;
+        Object.keys(this.controlButtons).forEach(key => {
+            this.controlButtons[key].classList.toggle('active', key === mode);
+        });
+        this.resetGame();
+    }
+    selectWord() {
+        if (this.gameMode === 'random') {
+            const randomIndex = Math.floor(Math.random() * this.wordList.length);
+            this.word = this.wordList[randomIndex];
+        } else {
+            this.word = this.wordList[this.currentWordIndex];
+            if (this.currentWordIndex < this.wordList.length - 1) {
+                this.currentWordIndex++;
+            } else {
+                this.currentWordIndex = 0;
+            }
+        }
+        console.log("Palavra selecionada:", this.word);
+    }
+    createBoard() {
+        const board = document.getElementById("board");
+        board.innerHTML = '';
+        for (let r = 0; r < this.height; r++) {
+            for (let c = 0; c < this.width; c++) {
+                const tile = document.createElement("span");
+                tile.id = `${r}-${c}`;
+                tile.classList.add("tile");
+                board.appendChild(tile);
+            }
+        }
+    }
+    createKeyboard() {
+        const keyboard = [
+            ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+            ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ç"],
+            ["Enter", "Z", "X", "C", "V", "B", "N", "M", "⌫"]
+        ];
+        keyboard.forEach(row => {
+            const keyboardRow = document.createElement("div");
+            keyboardRow.classList.add("keyboard-row");
+            row.forEach(key => {
+                const keyTile = document.createElement("div");
+                keyTile.innerText = key;
+                if (key === "Enter") {
+                    keyTile.id = "Enter";
+                    keyTile.classList.add("enter-key-tile");
+                } else if (key === "⌫") {
+                    keyTile.id = "Backspace";
+                    keyTile.classList.add("key-tile");
+                } else {
+                    keyTile.id = "Key" + key;
+                    keyTile.classList.add("key-tile");
+                }
+                keyTile.addEventListener("click", () => this.processInput({ code: keyTile.id }));
+                keyboardRow.appendChild(keyTile);
+            });
+            document.body.appendChild(keyboardRow);
+        });
+    }
+    setupEventListeners() {
+        document.addEventListener("keyup", (e) => this.processInput(e));
+    }
+    processInput(e) {
+        if (this.gameOver) return;
+        if (("KeyA" <= e.code && e.code <= "KeyZ") || e.code === "KeyÇ") {
+            this.addLetter(e.code === "KeyÇ" ? "Ç" : e.code[3]);
+        } else if (e.code === "Backspace") {
+            this.removeLetter();
+        } else if (e.code === "Enter") {
+            this.submitGuess();
+        }
+    }
+    addLetter(letter) {
+        if (this.col < this.width) {
+            const tile = document.getElementById(`${this.row}-${this.col}`);
+            if (!tile.innerText) {
+                tile.innerText = letter;
+                this.col++;
+            }
+        }
+    }
+    removeLetter() {
+        if (this.col > 0) {
+            this.col--;
+            const tile = document.getElementById(`${this.row}-${this.col}`);
+            tile.innerText = "";
+        }
+    }
+    submitGuess() {
+        const guess = Array.from({ length: this.width }, (_, i) => 
+            document.getElementById(`${this.row}-${i}`).innerText
+        ).join("");
+        if (guess.length < this.width) {
+            alert("Palavra muito curta!");
+            return;
+        }
+        const normalizedGuess = this.normalizeWord(guess);
+        if (!this.wordList.includes(normalizedGuess)) {
+            alert("Palavra não encontrada na lista!");
+            return;
+        }
+        this.checkGuess(normalizedGuess);
+    }
     checkGuess(guess) {
         const letterCount = {};
         [...this.word].forEach(letter => {
@@ -185,31 +201,35 @@ class TermoGame {
         this.row++;
         this.col = 0;
         if (correct === this.width) {
-            this.wordsCompleted++;
-            if (this.wordsCompleted === this.fixedWords.length) {
-                this.gameOver = true;
-                const finalTime = Date.now() - this.startTime;
-                this.saveScore(finalTime);
-                setTimeout(() => {
-                    alert(`Parabéns ${this.playerName}! Você completou todas as palavras em ${this.formatTime(finalTime)}!`);
-                    this.showRanking();
-                }, 500);
-            } else {
-                setTimeout(() => {
-                    alert("Palavra correta! Próxima palavra...");
-                    this.resetForNextWord();
-                }, 500);
-            }
+            this.gameOver = true;
+            setTimeout(() => {
+                alert("Parabéns! Você acertou!");
+                this.resetGame();
+            }, 500);
         } else if (this.row === this.height) {
             this.gameOver = true;
             document.getElementById("answer").innerText = this.word;
             setTimeout(() => {
                 alert("Fim de jogo! A palavra era: " + this.word);
-                location.reload();
+                this.resetGame();
             }, 500);
         }
     }
-    resetForNextWord() {
+    updateTile(tile, letter, status) {
+        tile.classList.add(status);
+        const keyTile = document.getElementById(`Key${letter}`);
+        if (keyTile) {
+            if (status === "correct") {
+                keyTile.classList.remove("present");
+                keyTile.classList.add("correct");
+            } else if (status === "present" && !keyTile.classList.contains("correct")) {
+                keyTile.classList.add("present");
+            } else if (status === "absent" && !keyTile.classList.contains("correct") && !keyTile.classList.contains("present")) {
+                keyTile.classList.add("absent");
+            }
+        }
+    }
+    resetGame() {
         const tiles = document.querySelectorAll('.tile');
         tiles.forEach(tile => {
             tile.innerText = '';
@@ -221,28 +241,9 @@ class TermoGame {
         });
         this.row = 0;
         this.col = 0;
+        this.gameOver = false;
+        document.getElementById("answer").innerText = '';
         this.selectWord();
-    }
-    async initialize() {
-        await this.loadWordList();
-        this.createControls();
-        this.createBoard();
-        this.createKeyboard();
-        this.setupEventListeners();
-        this.selectWord();
-        this.createTimer();
-        setInterval(() => this.updateTimer(), 1000);
-    }
-    createTimer() {
-        const timer = document.createElement('div');
-        timer.id = 'timer';
-        timer.style.cssText = `
-            font-size: 1.5rem;
-            margin: 1rem;
-            font-weight: bold;
-        `;
-        timer.textContent = '0:00';
-        document.getElementById('controls').appendChild(timer);
     }
 }
 window.onload = () => new TermoGame();
