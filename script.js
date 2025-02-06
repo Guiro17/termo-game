@@ -2,6 +2,7 @@ const GAME_CONFIG = {
     mode: "random", // "random" para aleatório, "sequence" para sequência fixa
     fixedWords: [] // Palavras que serão usadas no modo sequence
 };
+
 class TermoGame {
     constructor() {
         this.height = 6;    // número de tentativas
@@ -16,6 +17,7 @@ class TermoGame {
         this.fixedWords = GAME_CONFIG.fixedWords;
         this.initialize();
     }
+
     async initialize() {
         await this.loadWordList();
         this.createControls();
@@ -24,30 +26,49 @@ class TermoGame {
         this.setupEventListeners();
         this.selectWord();
     }
+
     async loadWordList() {
         if (this.gameMode === "sequence") {
             this.wordList = this.fixedWords.map(word => this.normalizeWord(word));
             console.log("Usando lista fixa de palavras:", this.wordList);
             return;
         }
+
+        // Lista de palavras padrão caso não consiga carregar o arquivo
+        const defaultWords = ["TERMO", "TESTE", "PLANO", "CAMPO", "VERDE", "PROVA", "FAZER", "MUNDO", "NOITE", "CANTO", 
+                            "FESTA", "CORES", "PARTE", "CALOR", "FALAR", "PODER", "AMIGO", "TEMPO", "FORTE", "PORTA",
+                            "LIVRE", "SONHO", "TERRA", "FELIZ", "CLARA", "PONTO", "CARTA", "LINHA", "CAUSA", "PAPEL"];
+        
         try {
             const response = await fetch('palavras.txt');
+            if (!response.ok) {
+                throw new Error('Arquivo não encontrado');
+            }
             const text = await response.text();
             this.wordList = text.split('\n')
-                               .filter(word => word.trim().length === 5)
+                               .map(word => word.trim())
+                               .filter(word => word.length === 5)
                                .map(word => this.normalizeWord(word));
-            console.log(`Carregadas ${this.wordList.length} palavras válidas`);
+
+            if (this.wordList.length === 0) {
+                console.warn('Lista de palavras vazia, usando lista padrão');
+                this.wordList = defaultWords;
+            }
         } catch (error) {
-            console.error('Erro ao carregar lista de palavras:', error);
-            this.wordList = ["TERMO", "TESTE", "PLANO", "CAMPO", "VERDE"];
+            console.warn('Erro ao carregar lista de palavras:', error);
+            this.wordList = defaultWords;
         }
+        
+        console.log(`Carregadas ${this.wordList.length} palavras válidas`);
     }
+
     normalizeWord(word) {
         return word.trim()
                   .toUpperCase()
                   .normalize('NFD')
                   .replace(/[\u0300-\u036f]/g, '');
     }
+
     createControls() {
         const controls = document.getElementById('controls');
         const randomBtn = document.createElement('button');
@@ -65,6 +86,7 @@ class TermoGame {
             sequence: sequenceBtn
         };
     }
+
     setGameMode(mode) {
         this.gameMode = mode;
         this.currentWordIndex = 0;
@@ -73,6 +95,7 @@ class TermoGame {
         });
         this.resetGame();
     }
+
     selectWord() {
         if (this.gameMode === 'random') {
             const randomIndex = Math.floor(Math.random() * this.wordList.length);
@@ -87,6 +110,7 @@ class TermoGame {
         }
         console.log("Palavra selecionada:", this.word);
     }
+
     createBoard() {
         const board = document.getElementById("board");
         board.innerHTML = '';
@@ -99,6 +123,7 @@ class TermoGame {
             }
         }
     }
+
     createKeyboard() {
         const keyboard = [
             ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -127,9 +152,11 @@ class TermoGame {
             document.body.appendChild(keyboardRow);
         });
     }
+
     setupEventListeners() {
         document.addEventListener("keyup", (e) => this.processInput(e));
     }
+
     processInput(e) {
         if (this.gameOver) return;
         if (("KeyA" <= e.code && e.code <= "KeyZ") || e.code === "KeyÇ") {
@@ -140,6 +167,7 @@ class TermoGame {
             this.submitGuess();
         }
     }
+
     addLetter(letter) {
         if (this.col < this.width) {
             const tile = document.getElementById(`${this.row}-${this.col}`);
@@ -149,6 +177,7 @@ class TermoGame {
             }
         }
     }
+
     removeLetter() {
         if (this.col > 0) {
             this.col--;
@@ -156,27 +185,41 @@ class TermoGame {
             tile.innerText = "";
         }
     }
+
     submitGuess() {
         const guess = Array.from({ length: this.width }, (_, i) => 
             document.getElementById(`${this.row}-${i}`).innerText
         ).join("");
+
         if (guess.length < this.width) {
             alert("Palavra muito curta!");
             return;
         }
+
         const normalizedGuess = this.normalizeWord(guess);
-        if (!this.wordList.includes(normalizedGuess)) {
+        
+        // Debug da validação
+        console.log('Tentativa:', normalizedGuess);
+        console.log('Lista de palavras:', this.wordList);
+        console.log('Palavra está na lista?', this.wordList.includes(normalizedGuess));
+
+        // Permite a palavra se ela estiver na lista ou for igual à palavra correta
+        if (!this.wordList.includes(normalizedGuess) && normalizedGuess !== this.word) {
             alert("Palavra não encontrada na lista!");
             return;
         }
+
         this.checkGuess(normalizedGuess);
     }
+
     checkGuess(guess) {
         const letterCount = {};
         [...this.word].forEach(letter => {
             letterCount[letter] = (letterCount[letter] || 0) + 1;
         });
+
         let correct = 0;
+        // Primeiro passo: marcar as letras corretas
         for (let i = 0; i < this.width; i++) {
             const tile = document.getElementById(`${this.row}-${i}`);
             const letter = this.normalizeWord(tile.innerText);
@@ -186,6 +229,8 @@ class TermoGame {
                 correct++;
             }
         }
+
+        // Segundo passo: marcar as letras presentes em posição errada ou ausentes
         for (let i = 0; i < this.width; i++) {
             const tile = document.getElementById(`${this.row}-${i}`);
             const letter = this.normalizeWord(tile.innerText);
@@ -198,8 +243,10 @@ class TermoGame {
                 }
             }
         }
+
         this.row++;
         this.col = 0;
+
         if (correct === this.width) {
             this.gameOver = true;
             setTimeout(() => {
@@ -215,6 +262,7 @@ class TermoGame {
             }, 500);
         }
     }
+
     updateTile(tile, letter, status) {
         tile.classList.add(status);
         const keyTile = document.getElementById(`Key${letter}`);
@@ -229,6 +277,7 @@ class TermoGame {
             }
         }
     }
+
     resetGame() {
         const tiles = document.querySelectorAll('.tile');
         tiles.forEach(tile => {
@@ -246,4 +295,5 @@ class TermoGame {
         this.selectWord();
     }
 }
+
 window.onload = () => new TermoGame();
