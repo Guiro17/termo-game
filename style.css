@@ -46,34 +46,6 @@ hr {
     margin: 1rem 0;
 }
 
-#controls {
-    margin-bottom: 1rem;
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.control-btn {
-    background-color: var(--key-bg);
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: bold;
-    transition: transform 0.1s ease;
-}
-
-.control-btn:hover {
-    transform: scale(1.05);
-}
-
-.control-btn.active {
-    background-color: var(--correct-color);
-}
-
 #board {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -165,6 +137,20 @@ footer a:hover {
     text-decoration: underline;
 }
 
+/* Toast Message */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    z-index: 1000;
+}
+
+/* Responsive Design */
 @media (max-width: 500px) {
     #board {
         max-width: 300px;
@@ -182,4 +168,3 @@ footer a:hover {
     .enter-key-tile {
         min-width: 60px;
     }
-}
